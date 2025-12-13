@@ -1,21 +1,27 @@
 # AI Voice Recorder Plus 🎙️
 
-A premium Web-based AI Voice Recorder with Waveform visualization, Voice Triggers, and Google Gemini Integration.
+iPhone(iOS)・Android・PC対応の、AI搭載ボイスレコーダー Webアプリです。
+PWA対応のため、ホーム画面に追加してアプリとして利用できます。
 
-## Features
-- **Premium UI**: Glassmorphism design, dark mode, responsive for Mobile (PWA).
-- **Advanced Audio**: Web Audio API based Noise Suppression and Gain Normalization.
-- **Smart Triggers**: Auto-record on "Start/開始" voice command.
-- **Apple Intelligence Ready**: Transcript output designed for iOS system "Writing Tools".
-- **AI Powered**: Integrates with Google Gemini (Free Tier) to Summarize and Transcribe recordings.
+[📱 アプリを開く](https://ska314.github.io/AI-Recorder/) ← 公開設定後、ここからアクセスできます
 
-## Deployment
-This project is ready for GitHub Pages.
-1. Push to GitHub.
-2. Go to Settings > Pages.
-3. Enable source from `main` branch.
+## ✨ 主な機能
 
-## Technologies
-- HTML5, CSS3, Vanilla JavaScript
-- Web Audio API
-- Web Speech API
+- **💎 プレミアムUI**: グラスモーフィズムデザイン（すりガラス風）とダークモード
+- **👆 簡単操作**: 録音ボタンは1つだけ。タップで開始・停止
+- **📂 録音リスト**: 録音したデータをリスト管理・名前変更・再生
+- **🤖 AI要約 (Google Gemini)**: 無料のAPIキーを設定するだけで、会話の文字起こしと要約が可能
+- **🍎 Apple Intelligence対応**: iOSでは要約結果を標準の「Writing Tools」でさらに加工可能
+- **🌊 波形表示**: リアルタイムで音声を可視化
+
+## 📲 iPhoneでの使い方 (PWA)
+
+1. Safariでページを開く
+2. 画面下部の「共有」ボタン（□から↑が出ているアイコン）をタップ
+3. 「ホーム画面に追加」を選択
+4. ホーム画面のアイコンから起動すると、フルスクリーンでアプリのように使えます
+
+## 🛠️ 技術スタック
+- Vanilla JS (No Framework)
+- Web Audio API (Noise Suppression, Compressor)
+- Google Gemini API (1.5 Flash)
