@@ -1,27 +1,533 @@
-# AI Voice Recorder Plus 🎙️
+<!DOCTYPE html>
+<html lang="ja">
 
-iPhone(iOS)・Android・PC対応の、AI搭載ボイスレコーダー Webアプリです。
-PWA対応のため、ホーム画面に追加してアプリとして利用できます。
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AI Voice Recorder</title>
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3039/3039396.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'apple-gray': '#f5f5f7',
+                        'apple-dark': '#1d1d1f',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-glow': 'pulse-glow 3s linear infinite',
+                        'mesh-rotate': 'mesh-rotate 3s linear infinite',
+                    },
+                    keyframes: {
+                        'pulse-glow': {
+                            '0%, 100%': { opacity: 0.5, transform: 'scale(1)' },
+                            '50%': { opacity: 0.8, transform: 'scale(1.05)' },
+                        },
+                        'mesh-rotate': {
+                            '0%': { transform: 'rotate(0deg)' },
+                            '100%': { transform: 'rotate(360deg)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom Utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
 
-[📱 アプリを開く](https://ska314.github.io/AI-Recorder/) ← 公開設定後、ここからアクセスできます
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
 
-## ✨ 主な機能
+<body class="bg-[#f2f2f7] text-[#1c1c1e] antialiased min-h-screen flex justify-center items-center p-4 font-sans">
 
-- **💎 プレミアムUI**: グラスモーフィズムデザイン（すりガラス風）とダークモード
-- **👆 簡単操作**: 録音ボタンは1つだけ。タップで開始・停止
-- **📂 録音リスト**: 録音したデータをリスト管理・名前変更・再生
-- **🤖 AI要約 (Google Gemini)**: 無料のAPIキーを設定するだけで、会話の文字起こしと要約が可能
-- **🍎 Apple Intelligence対応**: iOSでは要約結果を標準の「Writing Tools」でさらに加工可能
-- **🌊 波形表示**: リアルタイムで音声を可視化
+    <div
+        class="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden min-h-[800px] relative flex flex-col">
 
-## 📲 iPhoneでの使い方 (PWA)
+        <!-- Header -->
+        <header class="pt-12 pb-4 text-center relative">
+            <h1 class="text-2xl font-semibold text-gray-900 tracking-tight">AIボイスレコーダー</h1>
+            <button onclick="openSettings()"
+                class="absolute right-6 top-12 p-2 rounded-full hover:bg-gray-100 text-gray-400">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+            </button>
+        </header>
 
-1. Safariでページを開く
-2. 画面下部の「共有」ボタン（□から↑が出ているアイコン）をタップ
-3. 「ホーム画面に追加」を選択
-4. ホーム画面のアイコンから起動すると、フルスクリーンでアプリのように使えます
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col items-center px-6">
 
-## 🛠️ 技術スタック
-- Vanilla JS (No Framework)
-- Web Audio API (Noise Suppression, Compressor)
-- Google Gemini API (1.5 Flash)
+            <!-- Recorder Section -->
+            <div class="mt-8 mb-12 w-full flex flex-col items-center">
+                <!-- Status/Timer -->
+                <div class="h-8 mb-4">
+                    <div id="recording-status"
+                        class="text-red-500 font-semibold tracking-wider text-sm opacity-0 transition-opacity duration-300">
+                        00:00
+                    </div>
+                </div>
+
+                <!-- Main Button Wrapper -->
+                <div class="relative group cursor-pointer select-none" onclick="toggleRecording()">
+
+                    <!-- Glow Effect -->
+                    <div id="glow-effect"
+                        class="absolute inset-0 -m-4 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 blur-2xl opacity-0 transition-opacity duration-500 block">
+                    </div>
+
+                    <!-- Button -->
+                    <div id="record-btn"
+                        class="w-32 h-32 rounded-full flex items-center justify-center shadow-lg relative z-10 transition-all duration-500 ease-out bg-gradient-to-br from-indigo-400 via-purple-400 to-pink-400">
+                        <i data-lucide="mic" class="text-white w-12 h-12" id="btn-icon"></i>
+                    </div>
+
+                    <!-- Idle Ripple -->
+                    <div id="idle-ripple"
+                        class="absolute inset-0 rounded-full border border-purple-200 scale-110 opacity-50"></div>
+                </div>
+
+                <p id="status-text" class="mt-8 text-gray-500 text-sm font-medium tracking-wide">タップして録音</p>
+
+                <!-- Waveform Visualization (Mock) -->
+                <div id="waveform" class="h-16 w-full mt-8 flex items-center justify-center gap-1 opacity-50">
+                    <!-- Bars generated by JS -->
+                </div>
+            </div>
+
+            <!-- List Section -->
+            <div class="w-full mt-auto mb-8">
+                <!-- Search -->
+                <div class="relative mb-6">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="h-4 w-4 text-gray-400"></i>
+                    </div>
+                    <input type="text"
+                        class="block w-full pl-10 pr-3 py-2 border-none rounded-xl bg-gray-100/80 text-sm focus:ring-2 focus:ring-blue-500/50 focus:bg-white transition-all placeholder-gray-500 outline-none"
+                        placeholder="検索">
+                </div>
+
+                <div id="recordings-list" class="space-y-1">
+                    <!-- List items generated by JS -->
+                </div>
+
+                <button
+                    class="fixed bottom-8 right-8 w-14 h-14 bg-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center justify-center text-gray-800 hover:scale-105 active:scale-95 transition-transform z-40">
+                    <i data-lucide="plus" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- AI Summary Modal -->
+        <div id="summary-modal"
+            class="absolute inset-0 bg-black/20 backdrop-blur-sm z-40 flex items-end sm:items-center justify-center p-4 hidden transition-opacity duration-300 opacity-0"
+            onclick="closeModal()">
+            <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative overflow-hidden transform translate-y-full transition-transform duration-300"
+                id="modal-content" onclick="event.stopPropagation()">
+
+                <!-- AI Background -->
+                <div id="ai-bg"
+                    class="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-pink-500/10 hidden animate-pulse pointer-events-none">
+                </div>
+
+                <div class="flex justify-between items-center mb-4 relative z-10">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="sparkles" id="modal-icon" class="w-5 h-5 text-gray-900"></i>
+                        <h2 class="font-bold text-lg">AI要約</h2>
+                    </div>
+                    <button onclick="closeModal()" class="p-1 rounded-full hover:bg-gray-100">
+                        <i data-lucide="x" class="w-5 h-5 text-gray-500"></i>
+                    </button>
+                </div>
+
+                <div class="relative z-10 min-h-[150px]" id="modal-body">
+                    <!-- Content injected by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal (API Key) -->
+        <div id="settings-modal"
+            class="absolute inset-0 bg-black/20 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden"
+            onclick="closeSettings()">
+            <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl" onclick="event.stopPropagation()">
+                <h2 class="font-bold text-lg mb-4">設定</h2>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Google Gemini API Key</label>
+                    <input type="password" id="api-key-input"
+                        class="block w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="AIzaSy...">
+                    <p class="text-xs text-gray-500 mt-2">
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank"
+                            class="text-blue-500 hover:undefined">キーを取得する (無料)</a>
+                    </p>
+                </div>
+                <button onclick="saveSettings()"
+                    class="w-full bg-black text-white py-3 rounded-xl font-medium active:scale-95 transition-transform">保存</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- State & Data ---
+        const state = {
+            isRecording: false,
+            time: 0,
+            timerInterval: null,
+            mediaRecorder: null,
+            chunks: [],
+            recognition: null,
+            transcript: '',
+            apiKey: localStorage.getItem('gemini_api_key') || '',
+            recordings: [
+                { id: 1, title: '会議録音（デモ）', date: '2023/10/24', duration: '01:52', transcript: '本日の議題は...', summary: '本日の会議では、Q4の売上目標について議論しました。' },
+            ]
+        };
+
+        // --- DOM Elements ---
+        const els = {
+            status: document.getElementById('recording-status'),
+            glow: document.getElementById('glow-effect'),
+            btn: document.getElementById('record-btn'),
+            icon: document.getElementById('btn-icon'),
+            ripple: document.getElementById('idle-ripple'),
+            statusText: document.getElementById('status-text'),
+            waveform: document.getElementById('waveform'),
+            list: document.getElementById('recordings-list'),
+            modal: document.getElementById('summary-modal'),
+            modalContent: document.getElementById('modal-content'),
+            modalBody: document.getElementById('modal-body'),
+            modalIcon: document.getElementById('modal-icon'),
+            aiBg: document.getElementById('ai-bg'),
+            settingsModal: document.getElementById('settings-modal'),
+            apiKeyInput: document.getElementById('api-key-input')
+        };
+
+        // --- Initialization ---
+        function init() {
+            lucide.createIcons();
+            renderList();
+            setupWaveform();
+            if (state.apiKey) els.apiKeyInput.value = state.apiKey;
+
+            // Setup Speech Recognition
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                state.recognition = new SpeechRecognition();
+                state.recognition.continuous = true;
+                state.recognition.interimResults = true;
+                state.recognition.lang = 'ja-JP';
+
+                state.recognition.onresult = (event) => {
+                    let interim = '';
+                    let final = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            final += event.results[i][0].transcript;
+                        } else {
+                            interim += event.results[i][0].transcript;
+                        }
+                    }
+                    state.transcript = final + interim;
+                    console.log(state.transcript);
+                };
+            }
+        }
+
+        // --- Settings ---
+        function openSettings() {
+            els.settingsModal.classList.remove('hidden');
+        }
+        function closeSettings() {
+            els.settingsModal.classList.add('hidden');
+        }
+        function saveSettings() {
+            const key = els.apiKeyInput.value.trim();
+            state.apiKey = key;
+            localStorage.setItem('gemini_api_key', key);
+            alert('設定を保存しました');
+            closeSettings();
+        }
+
+        // --- Logic: Recording ---
+        async function toggleRecording() {
+            if (state.isRecording) {
+                stopRecording();
+            } else {
+                await startRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                state.mediaRecorder = new MediaRecorder(stream);
+                state.chunks = [];
+                state.transcript = '';
+
+                state.mediaRecorder.ondataavailable = e => state.chunks.push(e.data);
+                state.mediaRecorder.onstop = () => {
+                    const blob = new Blob(state.chunks, { type: 'audio/wav' }); // or webm
+                    saveRecording(blob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                state.mediaRecorder.start();
+                if (state.recognition) state.recognition.start();
+
+                state.isRecording = true;
+                state.time = 0;
+                state.timerInterval = setInterval(() => {
+                    state.time++;
+                    els.status.textContent = formatTime(state.time);
+                }, 1000);
+
+                updateUIState(true);
+            } catch (err) {
+                console.error(err);
+                alert('マイクの使用が許可されていません。\niOSの場合はSafariでこのページを開いてください。設定 > Safari > マイクアクセスを確認してください。');
+            }
+        }
+
+        function stopRecording() {
+            if (state.mediaRecorder) state.mediaRecorder.stop();
+            if (state.recognition) state.recognition.stop();
+
+            clearInterval(state.timerInterval);
+            state.isRecording = false;
+            updateUIState(false);
+        }
+
+        function saveRecording(blob) {
+            const newRec = {
+                id: Date.now(),
+                title: '新規録音',
+                date: new Date().toLocaleDateString(),
+                duration: formatTime(state.time),
+                transcript: state.transcript,
+                summary: ''
+            };
+            state.recordings.unshift(newRec);
+            renderList();
+        }
+
+        // --- Logic: Real AI Summary ---
+        async function openSummary(id) {
+            const rec = state.recordings.find(r => r.id === id);
+            if (!rec) return;
+
+            els.modal.classList.remove('hidden');
+            setTimeout(() => {
+                els.modal.classList.remove('opacity-0');
+                els.modalContent.classList.remove('translate-y-full');
+            }, 10);
+
+            // Show current state
+            renderModalContent(rec, false);
+
+            // If no summary but we have transcript, auto-trigger AI
+            if (!rec.summary) {
+                renderLoading(true); // Show loading UI
+
+                if (!state.apiKey) {
+                    renderError("APIキーが設定されていません。右上の設定からキーを入力してください。");
+                    return;
+                }
+                if (!rec.transcript) {
+                    renderError("文字起こしデータがありません。");
+                    return;
+                }
+
+                // Real Gemini API Call
+                try {
+                    const summary = await callGeminiAPI(rec.transcript);
+                    rec.summary = summary;
+                    renderList();
+                    renderModalContent(rec, false);
+                } catch (error) {
+                    console.error(error);
+                    renderError("AIエラー: " + error.message);
+                }
+            }
+        }
+
+        async function callGeminiAPI(text) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${state.apiKey}`;
+            const data = {
+                contents: [{
+                    parts: [{
+                        text: `あなたはプロの編集者です。以下の会議や会話の音声認識テキストを読みやすく要約してください。\n\nテキスト:\n${text}\n\n要約:`
+                    }]
+                }]
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error?.message || 'Failed to fetch');
+            }
+
+            const json = await response.json();
+            return json.candidates[0].content.parts[0].text;
+        }
+
+        function renderLoading(isLoading) {
+            if (isLoading) {
+                els.aiBg.classList.remove('hidden');
+                els.modalIcon.classList.add('text-purple-600', 'animate-spin');
+                els.modalIcon.classList.remove('text-gray-900');
+
+                els.modalBody.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full gap-3 py-8">
+                    <div class="w-12 h-12 rounded-full border-2 border-purple-200 border-t-purple-600 animate-spin"></div>
+                    <p class="text-sm text-gray-500 font-medium">Apple Intelligenceが解析中...</p>
+                </div>
+             `;
+            }
+        }
+
+        function renderError(msg) {
+            els.aiBg.classList.add('hidden');
+            els.modalIcon.classList.remove('text-purple-600', 'animate-spin');
+            els.modalIcon.classList.add('text-gray-900');
+            els.modalBody.innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded-xl text-sm">${msg}</div>`;
+        }
+
+        function renderModalContent(rec, isInit) {
+            if (isInit && !rec.summary) return;
+
+            els.aiBg.classList.add('hidden');
+            els.modalIcon.classList.remove('text-purple-600', 'animate-spin');
+            els.modalIcon.classList.add('text-gray-900');
+
+            els.modalBody.innerHTML = `
+            <div class="space-y-3">
+                <div class="p-4 bg-gray-50 rounded-2xl text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
+                    ${rec.summary || ""}
+                </div>
+                ${rec.transcript ? `
+                <div class="mt-4">
+                    <h3 class="text-xs font-semibold text-gray-400 mb-1 uppercase tracking-wider">文字起こし</h3>
+                    <p class="text-xs text-gray-500 line-clamp-5 hover:line-clamp-none transition-all cursor-pointer">${rec.transcript}</p>
+                </div>` : ''}
+            </div>
+        `;
+        }
+
+        function closeModal() {
+            els.modal.classList.add('opacity-0');
+            els.modalContent.classList.add('translate-y-full');
+            setTimeout(() => {
+                els.modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- UI Helpers ---
+        function updateUIState(recording) {
+            if (recording) {
+                els.status.classList.remove('opacity-0');
+                els.glow.classList.remove('opacity-0');
+                els.glow.classList.add('animate-mesh-rotate');
+                els.btn.classList.replace('bg-gradient-to-br', 'bg-gradient-to-r'); // mock change
+                els.btn.classList.add('scale-95');
+                els.btn.innerHTML = '<i data-lucide="square" class="text-white w-12 h-12 fill-current"></i>';
+                els.ripple.classList.add('hidden');
+                els.statusText.textContent = '録音中...';
+                startWaveformAnim();
+            } else {
+                els.status.classList.add('opacity-0');
+                els.glow.classList.add('opacity-0');
+                els.glow.classList.remove('animate-mesh-rotate');
+                els.btn.classList.remove('scale-95');
+                els.btn.innerHTML = '<i data-lucide="mic" class="text-white w-12 h-12"></i>';
+                els.ripple.classList.remove('hidden');
+                els.statusText.textContent = 'タップして録音';
+                stopWaveformAnim();
+            }
+            lucide.createIcons();
+        }
+
+        function renderList() {
+            els.list.innerHTML = state.recordings.map(rec => `
+            <div class="group flex items-center justify-between p-4 bg-white hover:bg-gray-50 rounded-2xl transition-colors cursor-pointer border-b border-gray-100 last:border-0" onclick="state.selectedId = ${rec.id}">
+                <div class="flex flex-col">
+                    <span class="font-semibold text-gray-900 text-[15px]">${rec.title}</span>
+                    <span class="text-gray-500 text-xs mt-1 font-medium tracking-wide">${rec.duration} • ${rec.date}</span>
+                </div>
+                <div class="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                    <button onclick="event.stopPropagation(); openSummary(${rec.id})" class="p-2 rounded-full hover:bg-purple-100 text-purple-600 transition-colors">
+                        <i data-lucide="sparkles" class="w-4 h-4 fill-current"></i>
+                    </button>
+                    <button class="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition-colors">
+                        <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                    </button>
+                    <button class="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition-colors">
+                        <i data-lucide="more-horizontal" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+            lucide.createIcons();
+        }
+
+        let waveInterval;
+        function setupWaveform() {
+            els.waveform.innerHTML = Array(20).fill(0).map(() => '<div class="w-1 h-2 bg-gray-200 rounded-full transition-all duration-300 wave-bar"></div>').join('');
+        }
+
+        function startWaveformAnim() {
+            const bars = document.querySelectorAll('.wave-bar');
+            waveInterval = setInterval(() => {
+                bars.forEach(bar => {
+                    const h = Math.floor(Math.random() * 40) + 10;
+                    bar.style.height = h + 'px';
+                    bar.classList.replace('bg-gray-200', 'bg-blue-300');
+                });
+            }, 100);
+        }
+
+        function stopWaveformAnim() {
+            clearInterval(waveInterval);
+            const bars = document.querySelectorAll('.wave-bar');
+            bars.forEach(bar => {
+                bar.style.height = '8px';
+                bar.classList.replace('bg-blue-300', 'bg-gray-200');
+            });
+        }
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60).toString().padStart(2, '0');
+            const sc = (s % 60).toString().padStart(2, '0');
+            return `${m}:${sc}`;
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+
+</html>
