@@ -323,13 +323,23 @@
                 date: new Date().toLocaleDateString(),
                 duration: formatTime(state.time),
                 transcript: state.transcript,
-                summary: ''
+                summary: '',
+                blob: blob // Store blob for AI fallback
             };
             state.recordings.unshift(newRec);
             renderList();
         }
 
         // --- Logic: Real AI Summary ---
+        // --- Helpers: Base64 ---
+        function blobToBase64(blob) {
+            return new Promise((resolve, _) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(blob);
+            });
+        }
+
         async function openSummary(id) {
             const rec = state.recordings.find(r => r.id === id);
             if (!rec) return;
@@ -340,26 +350,29 @@
                 els.modalContent.classList.remove('translate-y-full');
             }, 10);
 
-            // Show current state
             renderModalContent(rec, false);
 
-            // If no summary but we have transcript, auto-trigger AI
             if (!rec.summary) {
-                renderLoading(true); // Show loading UI
+                renderLoading(true);
 
                 if (!state.apiKey) {
                     renderError("APIキーが設定されていません。右上の設定からキーを入力してください。");
                     return;
                 }
-                if (!rec.transcript) {
-                    renderError("文字起こしデータがありません。");
-                    return;
-                }
 
-                // Real Gemini API Call
                 try {
-                    const summary = await callGeminiAPI(rec.transcript);
-                    rec.summary = summary;
+                    // Fallback to Audio AI if no transcript (iOS Safari case)
+                    if (!rec.transcript) {
+                        const summary = await callGeminiAudioAPI(rec.blob); // We need to store blob in new recordings
+                        rec.summary = summary;
+                        // iOS fallback: also set a mock transcript saying "Audio processed"
+                        if (!rec.transcript) rec.transcript = "(音声データから直接AIが解析しました)";
+                    } else {
+                        // Text-based AI
+                        const summary = await callGeminiTextAPI(rec.transcript);
+                        rec.summary = summary;
+                    }
+
                     renderList();
                     renderModalContent(rec, false);
                 } catch (error) {
@@ -369,7 +382,7 @@
             }
         }
 
-        async function callGeminiAPI(text) {
+        async function callGeminiTextAPI(text) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${state.apiKey}`;
             const data = {
                 contents: [{
@@ -378,7 +391,31 @@
                     }]
                 }]
             };
+            return fetchGemini(url, data);
+        }
 
+        async function callGeminiAudioAPI(blob) {
+            // Gemini 1.5 Flash is recommended for multimodal (Audio)
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.apiKey}`;
+
+            const base64Audio = await blobToBase64(blob);
+            const data = {
+                contents: [{
+                    parts: [
+                        { text: "この音声を文字起こしして、その後に要約を作成してください。\n出力フォーマット:\n【文字起こし】\n...\n\n【要約】\n..." },
+                        {
+                            inline_data: {
+                                mime_type: blob.type || "audio/mp4",
+                                data: base64Audio
+                            }
+                        }
+                    ]
+                }]
+            };
+            return fetchGemini(url, data);
+        }
+
+        async function fetchGemini(url, data) {
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
