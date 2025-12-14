@@ -197,10 +197,51 @@
             recognition: null,
             transcript: '',
             apiKey: localStorage.getItem('gemini_api_key') || '',
-            recordings: [
-                { id: 1, title: '会議録音（デモ）', date: '2023/10/24', duration: '01:52', transcript: '本日の議題は...', summary: '本日の会議では、Q4の売上目標について議論しました。' },
-            ]
+            recordings: []
         };
+
+        // --- IndexedDB ---
+        const DB_NAME = 'VoiceRecorderDB';
+        const DB_VERSION = 1;
+        let db;
+
+        function initDB() {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+            request.onerror = (event) => console.error("DB Error", event);
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('recordings')) {
+                    const store = db.createObjectStore('recordings', { keyPath: 'id' });
+                }
+            };
+
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                loadRecordings();
+            };
+        }
+
+        function saveRecToDB(rec) {
+            if (!db) return;
+            const tx = db.transaction(['recordings'], 'readwrite');
+            const store = tx.objectStore('recordings');
+            store.put(rec);
+        }
+
+        function loadRecordings() {
+            if (!db) return;
+            const tx = db.transaction(['recordings'], 'readonly');
+            const store = tx.objectStore('recordings');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                // Sort by ID desc (newest first)
+                state.recordings = request.result.sort((a, b) => b.id - a.id);
+                renderList();
+            };
+        }
 
         // --- DOM Elements ---
         const els = {
@@ -224,7 +265,7 @@
         // --- Initialization ---
         function init() {
             lucide.createIcons();
-            renderList();
+            initDB(); // Load data
             setupWaveform();
             if (state.apiKey) els.apiKeyInput.value = state.apiKey;
 
@@ -327,6 +368,7 @@
                 blob: blob // Store blob for AI fallback
             };
             state.recordings.unshift(newRec);
+            saveRecToDB(newRec);
             renderList();
         }
 
@@ -367,10 +409,12 @@
                         rec.summary = summary;
                         // iOS fallback: also set a mock transcript saying "Audio processed"
                         if (!rec.transcript) rec.transcript = "(音声データから直接AIが解析しました)";
+                        saveRecToDB(rec); // Update DB
                     } else {
                         // Text-based AI
                         const summary = await callGeminiTextAPI(rec.transcript);
                         rec.summary = summary;
+                        saveRecToDB(rec); // Update DB
                     }
 
                     renderList();
